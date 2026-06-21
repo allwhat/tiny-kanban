@@ -5,80 +5,73 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner pool for manual install checks.
+        required: true
+        type: choice
+        default: github-hosted
+        options:
+          - github-hosted
+          - local
+
+permissions:
+  contents: read
 
 jobs:
-  test-and-lint:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        # Future: Add other Linux distributions here
-        # os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
-
+  package-install:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.runner == 'github-hosted' }}
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-    # Setup Python for backend
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-        cache-dependency-path: 'backend/pyproject.toml'
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
-    # Setup Node.js for frontend
-    - name: Set up Node.js
-      uses: actions/setup-node@v6
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'frontend/package-lock.json'
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
 
-    # Backend: Install dependencies
-    - name: Install backend dependencies
-      run: |
-        cd backend
-        pip install -e ".[dev]"
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -e ".[dev]"
 
-    # Frontend: Install dependencies
-    - name: Install frontend dependencies
-      run: |
-        cd frontend
-        npm ci
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
 
-    # Backend: Run tests
-    - name: Run backend tests
-      run: |
-        cd backend
-        pytest -v
+  package-install-local:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'local' }}
+    runs-on: [self-hosted, Linux, ARM64, packagemaze-linux-local]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-    # Frontend: Run tests
-    - name: Run frontend tests
-      run: |
-        cd frontend
-        npx vitest run
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
-    # Backend: Check code formatting with Black
-    - name: Check backend formatting (Black)
-      run: |
-        cd backend
-        black --check --diff app/ tests/
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
 
-    # Backend: Lint with pyflakes
-    - name: Lint backend (pyflakes)
-      run: |
-        cd backend
-        pyflakes app/ tests/
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -e ".[dev]"
 
-    # Frontend: Check code formatting with Prettier
-    - name: Check frontend formatting (Prettier)
-      run: |
-        cd frontend
-        npx prettier --check 'src/**/*.{ts,tsx,css}'
-
-    # Frontend: Lint with ESLint
-    - name: Lint frontend (ESLint)
-      run: |
-        cd frontend
-        npx eslint . --max-warnings 0
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   test-and-lint:
     runs-on: ${{ matrix.os }}
@@ -35,17 +39,53 @@ jobs:
         cache: 'npm'
         cache-dependency-path: 'frontend/package-lock.json'
 
+    - name: Set up PackageMaze CLI
+      uses: packagemaze/setup-maze@v0.0.1
+
+    - name: Exchange PackageMaze npm install token
+      id: packagemaze-npm-token
+      run: maze auth exchange-oidc --feed packagemaze/npm-smoke-test --purpose install --format github-output
+
+    - name: Exchange PackageMaze PyPI install token
+      id: packagemaze-pypi-token
+      run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
+
     # Backend: Install dependencies
     - name: Install backend dependencies
+      env:
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test"
       run: |
         cd backend
         pip install -e ".[dev]"
 
+    - name: Verify PackageMaze PyPI readback
+      env:
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test"
+      run: |
+        cd backend
+        python -m pip download --no-cache-dir --no-deps --dest "$RUNNER_TEMP/packagemaze-pypi-readback" fastapi==0.136.3
+        python - <<'PY'
+        import fastapi
+
+        print(f"PackageMaze PyPI readback: fastapi {fastapi.__version__}")
+        PY
+
     # Frontend: Install dependencies
     - name: Install frontend dependencies
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npm ci
+
+    - name: Verify PackageMaze npm readback
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
+      run: |
+        cd frontend
+        react_version="$(node -p "require('./node_modules/react/package.json').version")"
+        npm view "react@$react_version" version --registry=https://pkg.packagemaze.com/packagemaze/npm-smoke-test/
+        printf 'PackageMaze npm readback: react %s\n' "$react_version"
 
     # Backend: Run tests
     - name: Run backend tests
@@ -55,6 +95,8 @@ jobs:
 
     # Frontend: Run tests
     - name: Run frontend tests
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx vitest run
@@ -73,12 +115,16 @@ jobs:
 
     # Frontend: Check code formatting with Prettier
     - name: Check frontend formatting (Prettier)
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx prettier --check 'src/**/*.{ts,tsx,css}'
 
     # Frontend: Lint with ESLint
     - name: Lint frontend (ESLint)
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx eslint . --max-warnings 0

@@ -50,33 +50,6 @@ jobs:
       id: packagemaze-pypi-token
       run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
 
-    # Backend: Install dependencies
-    - name: Install backend dependencies
-      env:
-        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
-      run: |
-        cd backend
-        pip install -r requirements-dev.txt
-
-    - name: Verify PackageMaze PyPI readback
-      env:
-        PACKAGE_MAZE_PYPI_PACKAGE: pm-smoke-pypi-1782010652-c33184-twine-wheel-setuptools-publish-then-install
-        PACKAGE_MAZE_PYPI_MODULE: pm_smoke_pypi_1782010652_c33184_twine_wheel_setuptools_publish_then_install
-        PACKAGE_MAZE_PYPI_VERSION: 1.0.0
-        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
-      run: |
-        python -m venv "$RUNNER_TEMP/packagemaze-pypi-consumer"
-        "$RUNNER_TEMP/packagemaze-pypi-consumer/bin/python" -m pip install \
-          "${PACKAGE_MAZE_PYPI_PACKAGE}==${PACKAGE_MAZE_PYPI_VERSION}"
-        "$RUNNER_TEMP/packagemaze-pypi-consumer/bin/python" - <<'PY'
-        import importlib
-        import os
-
-        package = importlib.import_module(os.environ["PACKAGE_MAZE_PYPI_MODULE"])
-        assert package.ping()
-        print(f"PackageMaze PyPI readback: {os.environ['PACKAGE_MAZE_PYPI_PACKAGE']}")
-        PY
-
     # Frontend: Install dependencies
     - name: Install frontend dependencies
       env:
@@ -109,6 +82,33 @@ jobs:
         }
         console.log(`PackageMaze npm readback: ${process.env.PACKAGE_MAZE_NPM_PACKAGE}`);
         JS
+
+    # Backend: Install dependencies
+    - name: Install backend dependencies
+      env:
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
+      run: |
+        cd backend
+        pip install -r requirements-dev.txt
+
+    - name: Verify PackageMaze PyPI readback
+      env:
+        PACKAGE_MAZE_PYPI_PACKAGE: pm-smoke-pypi-1782010652-c33184-twine-wheel-setuptools-publish-then-install
+        PACKAGE_MAZE_PYPI_MODULE: pm_smoke_pypi_1782010652_c33184_twine_wheel_setuptools_publish_then_install
+        PACKAGE_MAZE_PYPI_VERSION: 1.0.0
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
+      run: |
+        python -m venv "$RUNNER_TEMP/packagemaze-pypi-consumer"
+        "$RUNNER_TEMP/packagemaze-pypi-consumer/bin/python" -m pip install \
+          "${PACKAGE_MAZE_PYPI_PACKAGE}==${PACKAGE_MAZE_PYPI_VERSION}"
+        "$RUNNER_TEMP/packagemaze-pypi-consumer/bin/python" - <<'PY'
+        import importlib
+        import os
+
+        package = importlib.import_module(os.environ["PACKAGE_MAZE_PYPI_MODULE"])
+        assert package.ping()
+        print(f"PackageMaze PyPI readback: {os.environ['PACKAGE_MAZE_PYPI_PACKAGE']}")
+        PY
 
     # Backend: Run tests
     - name: Run backend tests

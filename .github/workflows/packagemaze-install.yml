@@ -16,7 +16,12 @@ jobs:
     env:
       PACKAGE_MAZE_NPM_FEED: packagemaze/npm-smoke-test
       PACKAGE_MAZE_NPM_REGISTRY: https://pkg.packagemaze.com/packagemaze/npm-smoke-test/
+      PACKAGE_MAZE_NPM_PACKAGE: pm-smoke-npm-1782010647-c17fe9-npm11-commonjs-publish-install-download
+      PACKAGE_MAZE_NPM_VERSION: 1.0.0
       PACKAGE_MAZE_PYPI_FEED: packagemaze/pypi-smoke-test
+      PACKAGE_MAZE_PYPI_PACKAGE: pm-smoke-pypi-1782010652-c33184-twine-wheel-setuptools-publish-then-install
+      PACKAGE_MAZE_PYPI_MODULE: pm_smoke_pypi_1782010652_c33184_twine_wheel_setuptools_publish_then_install
+      PACKAGE_MAZE_PYPI_VERSION: 1.0.0
 
     steps:
       - uses: actions/checkout@v6
@@ -37,25 +42,39 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install backend dependencies through PackageMaze
+      - name: Install PyPI package through PackageMaze
         run: |
-          cd backend
-          python -m venv .venv
-          .venv/bin/python -m pip install -r requirements.txt
+          python -m venv /tmp/packagemaze-tiny-kanban-pypi-consumer
+          /tmp/packagemaze-tiny-kanban-pypi-consumer/bin/python -m pip install \
+            --index-url "$PIP_INDEX_URL" \
+            "${PACKAGE_MAZE_PYPI_PACKAGE}==${PACKAGE_MAZE_PYPI_VERSION}"
+          /tmp/packagemaze-tiny-kanban-pypi-consumer/bin/python - <<'PY'
+          import importlib
+          import os
+
+          package = importlib.import_module(os.environ["PACKAGE_MAZE_PYPI_MODULE"])
+          assert package.ping()
+          PY
         env:
           PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
 
-      - name: Configure PackageMaze npm install
+      - name: Install npm package through PackageMaze
         run: |
+          rm -rf /tmp/packagemaze-tiny-kanban-npm-consumer
+          mkdir -p /tmp/packagemaze-tiny-kanban-npm-consumer
+          cd /tmp/packagemaze-tiny-kanban-npm-consumer
           {
             printf 'registry=%s\n' "$PACKAGE_MAZE_NPM_REGISTRY"
             printf '//pkg.packagemaze.com/packagemaze/npm-smoke-test/:_authToken=${NODE_AUTH_TOKEN}\n'
             printf 'always-auth=true\n'
-          } > ~/.npmrc
-
-      - name: Install frontend dependencies through PackageMaze
-        run: |
-          cd frontend
-          npm ci
+          } > .npmrc
+          npm init -y
+          npm install "${PACKAGE_MAZE_NPM_PACKAGE}@${PACKAGE_MAZE_NPM_VERSION}" --ignore-scripts --no-audit --fund=false
+          node - <<'JS'
+          const installed = require(process.env.PACKAGE_MAZE_NPM_PACKAGE);
+          if (installed.smoke !== "alpha") {
+            throw new Error(`Unexpected smoke export: ${JSON.stringify(installed)}`);
+          }
+          JS
         env:
           NODE_AUTH_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}

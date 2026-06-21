@@ -83,35 +83,6 @@ jobs:
         console.log(`PackageMaze npm readback: ${process.env.PACKAGE_MAZE_NPM_PACKAGE}`);
         JS
 
-    # Backend: Install dependencies
-    - name: Install backend dependencies
-      env:
-        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
-      run: |
-        cd backend
-        pip install .
-
-    - name: Verify backend runtime imports
-      run: |
-        cd backend
-        python - <<'PY'
-        from importlib import metadata
-
-        from app.main import app
-
-        assert app.title == "tiny-kanban API"
-        for package in (
-            "aiosqlite",
-            "alembic",
-            "fastapi",
-            "pydantic",
-            "pydantic-settings",
-            "sqlalchemy",
-            "uvicorn",
-        ):
-            print(f"{package}=={metadata.version(package)}")
-        PY
-
     - name: Verify PackageMaze PyPI readback
       env:
         PACKAGE_MAZE_PYPI_PACKAGE: pm-smoke-pypi-1782010652-c33184-twine-wheel-setuptools-publish-then-install

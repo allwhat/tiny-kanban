@@ -56,7 +56,7 @@ jobs:
         PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test"
       run: |
         cd backend
-        pip install -e ".[dev]"
+        pip install -r requirements-dev.txt
 
     - name: Verify PackageMaze PyPI readback
       env:

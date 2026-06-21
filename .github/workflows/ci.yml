@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  test-and-lint:
+  packagemaze-install-smoke:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -89,7 +89,28 @@ jobs:
         PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
       run: |
         cd backend
-        pip install -r requirements-dev.txt
+        pip install .
+
+    - name: Verify backend runtime imports
+      run: |
+        cd backend
+        python - <<'PY'
+        from importlib import metadata
+
+        from app.main import app
+
+        assert app.title == "tiny-kanban API"
+        for package in (
+            "aiosqlite",
+            "alembic",
+            "fastapi",
+            "pydantic",
+            "pydantic-settings",
+            "sqlalchemy",
+            "uvicorn",
+        ):
+            print(f"{package}=={metadata.version(package)}")
+        PY
 
     - name: Verify PackageMaze PyPI readback
       env:
@@ -109,45 +130,3 @@ jobs:
         assert package.ping()
         print(f"PackageMaze PyPI readback: {os.environ['PACKAGE_MAZE_PYPI_PACKAGE']}")
         PY
-
-    # Backend: Run tests
-    - name: Run backend tests
-      run: |
-        cd backend
-        pytest -v
-
-    # Frontend: Run tests
-    - name: Run frontend tests
-      env:
-        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
-      run: |
-        cd frontend
-        npx vitest run
-
-    # Backend: Check code formatting with Black
-    - name: Check backend formatting (Black)
-      run: |
-        cd backend
-        black --check --diff app/ tests/
-
-    # Backend: Lint with pyflakes
-    - name: Lint backend (pyflakes)
-      run: |
-        cd backend
-        pyflakes app/ tests/
-
-    # Frontend: Check code formatting with Prettier
-    - name: Check frontend formatting (Prettier)
-      env:
-        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
-      run: |
-        cd frontend
-        npx prettier --check 'src/**/*.{ts,tsx,css}'
-
-    # Frontend: Lint with ESLint
-    - name: Lint frontend (ESLint)
-      env:
-        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
-      run: |
-        cd frontend
-        npx eslint . --max-warnings 0

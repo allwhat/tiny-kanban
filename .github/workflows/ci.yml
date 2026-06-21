@@ -42,16 +42,18 @@ jobs:
     - name: Set up PackageMaze CLI
       uses: packagemaze/setup-maze@v0.0.1
 
-    - name: Exchange PackageMaze npm install token
+    - name: Get PackageMaze npm install token
       id: packagemaze-npm-token
       run: maze auth exchange-oidc --feed packagemaze/npm-smoke-test --purpose install --format github-output
 
-    - name: Exchange PackageMaze PyPI install token
+    - name: Get PackageMaze PyPI install token
       id: packagemaze-pypi-token
       run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
 
     # Backend: Install dependencies
     - name: Install backend dependencies
+      env:
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test"
       run: |
         cd backend
         pip install -e ".[dev]"
@@ -61,7 +63,7 @@ jobs:
         PACKAGE_MAZE_PYPI_PACKAGE: pm-smoke-pypi-1782010652-c33184-twine-wheel-setuptools-publish-then-install
         PACKAGE_MAZE_PYPI_MODULE: pm_smoke_pypi_1782010652_c33184_twine_wheel_setuptools_publish_then_install
         PACKAGE_MAZE_PYPI_VERSION: 1.0.0
-        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/"
+        PIP_INDEX_URL: "https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test"
       run: |
         python -m venv "$RUNNER_TEMP/packagemaze-pypi-consumer"
         "$RUNNER_TEMP/packagemaze-pypi-consumer/bin/python" -m pip install \
@@ -77,6 +79,8 @@ jobs:
 
     # Frontend: Install dependencies
     - name: Install frontend dependencies
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npm ci
@@ -114,6 +118,8 @@ jobs:
 
     # Frontend: Run tests
     - name: Run frontend tests
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx vitest run
@@ -132,12 +138,16 @@ jobs:
 
     # Frontend: Check code formatting with Prettier
     - name: Check frontend formatting (Prettier)
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx prettier --check 'src/**/*.{ts,tsx,css}'
 
     # Frontend: Lint with ESLint
     - name: Lint frontend (ESLint)
+      env:
+        MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
       run: |
         cd frontend
         npx eslint . --max-warnings 0

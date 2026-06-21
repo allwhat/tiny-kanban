@@ -1,0 +1,72 @@
+name: PackageMaze Install Smoke
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-install-through-packagemaze:
+    name: npm install through PackageMaze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Set up PackageMaze CLI
+        uses: packagemaze/setup-maze@v0.0.1
+
+      - name: Exchange PackageMaze npm install token
+        id: packagemaze-npm-token
+        run: maze auth exchange-oidc --feed packagemaze/npm-smoke-test --purpose install --format github-output
+
+      - name: Install frontend dependencies from PackageMaze
+        env:
+          MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
+        run: |
+          cd frontend
+          test "$(npm config get registry)" = "https://pkg.packagemaze.com/packagemaze/npm-smoke-test/"
+          npm ci
+
+  pypi-install-through-packagemaze:
+    name: PyPI install through PackageMaze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PackageMaze CLI
+        uses: packagemaze/setup-maze@v0.0.1
+
+      - name: Exchange PackageMaze PyPI install token
+        id: packagemaze-pypi-token
+        run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
+
+      - name: Install backend dependencies from PackageMaze
+        env:
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
+        run: |
+          cd backend
+          pip install -e ".[dev]"

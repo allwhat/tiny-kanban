@@ -1,0 +1,61 @@
+name: PackageMaze install smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/packagemaze-oidc-install-test
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_MAZE_NPM_FEED: packagemaze/npm-smoke-test
+      PACKAGE_MAZE_NPM_REGISTRY: https://pkg.packagemaze.com/packagemaze/npm-smoke-test/
+      PACKAGE_MAZE_PYPI_FEED: packagemaze/pypi-smoke-test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: packagemaze/setup-maze@v0.0.1
+
+      - id: packagemaze-pypi-token
+        run: maze auth exchange-oidc --feed "$PACKAGE_MAZE_PYPI_FEED" --purpose install --format github-output
+
+      - id: packagemaze-npm-token
+        run: maze auth exchange-oidc --feed "$PACKAGE_MAZE_NPM_FEED" --purpose install --format github-output
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies through PackageMaze
+        run: |
+          cd backend
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+        env:
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
+
+      - name: Configure PackageMaze npm install
+        run: |
+          {
+            printf 'registry=%s\n' "$PACKAGE_MAZE_NPM_REGISTRY"
+            printf '//pkg.packagemaze.com/packagemaze/npm-smoke-test/:_authToken=${NODE_AUTH_TOKEN}\n'
+            printf 'always-auth=true\n'
+          } > ~/.npmrc
+
+      - name: Install frontend dependencies through PackageMaze
+        run: |
+          cd frontend
+          npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}

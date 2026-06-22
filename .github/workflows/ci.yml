@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   package-install:
@@ -38,12 +39,28 @@ jobs:
           node-version: '20'
           package-manager-cache: false
 
+      - name: Set up PackageMaze CLI
+        uses: packagemaze/setup-maze@v0.0.1
+
+      - name: Exchange PackageMaze PyPI install token
+        id: packagemaze-pypi-token
+        run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
+
+      - name: Exchange PackageMaze npm install token
+        id: packagemaze-npm-token
+        run: maze auth exchange-oidc --feed packagemaze/npm-smoke-test --purpose install --format github-output
+
       - name: Install backend dependencies
+        env:
+          PIP_EXTRA_INDEX_URL: ""
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
         run: |
           cd backend
           pip install -e ".[dev]"
 
       - name: Install frontend dependencies
+        env:
+          MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
         run: |
           cd frontend
           npm ci
@@ -66,12 +83,28 @@ jobs:
           node-version: '20'
           package-manager-cache: false
 
+      - name: Set up PackageMaze CLI
+        uses: packagemaze/setup-maze@v0.0.1
+
+      - name: Exchange PackageMaze PyPI install token
+        id: packagemaze-pypi-token
+        run: maze auth exchange-oidc --feed packagemaze/pypi-smoke-test --purpose install --format github-output
+
+      - name: Exchange PackageMaze npm install token
+        id: packagemaze-npm-token
+        run: maze auth exchange-oidc --feed packagemaze/npm-smoke-test --purpose install --format github-output
+
       - name: Install backend dependencies
+        env:
+          PIP_EXTRA_INDEX_URL: ""
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
         run: |
           cd backend
           pip install -e ".[dev]"
 
       - name: Install frontend dependencies
+        env:
+          MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
         run: |
           cd frontend
           npm ci

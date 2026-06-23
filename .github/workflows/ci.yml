@@ -112,3 +112,163 @@ jobs:
         run: |
           cd frontend
           npm ci
+
+  install-benchmark-packagemaze-cold:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' }}
+    runs-on: ubuntu-latest
+    name: Benchmark installs with PackageMaze (cold)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Set up PackageMaze for Python installs
+        id: packagemaze-pypi-token
+        uses: packagemaze/setup-maze@v0.0.2
+        with:
+          feed: packagemaze/pypi-smoke-test
+          purpose: install
+
+      - name: Install backend dependencies with PackageMaze
+        env:
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd backend
+          pip install -e ".[dev]"
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=pypi scenario=packagemaze-cold milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
+
+      - name: Set up PackageMaze for npm installs
+        id: packagemaze-npm-token
+        uses: packagemaze/setup-maze@v0.0.2
+        with:
+          feed: packagemaze/npm-smoke-test
+          purpose: install
+
+      - name: Install frontend dependencies with PackageMaze
+        env:
+          MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd frontend
+          npm ci
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=npm scenario=packagemaze-cold milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
+
+  install-benchmark-packagemaze-warm:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' }}
+    needs: install-benchmark-packagemaze-cold
+    runs-on: ubuntu-latest
+    name: Benchmark installs with PackageMaze (warm)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Set up PackageMaze for Python installs
+        id: packagemaze-pypi-token
+        uses: packagemaze/setup-maze@v0.0.2
+        with:
+          feed: packagemaze/pypi-smoke-test
+          purpose: install
+
+      - name: Install backend dependencies with PackageMaze
+        env:
+          PIP_INDEX_URL: https://__token__:${{ steps.packagemaze-pypi-token.outputs.token }}@pkg.packagemaze.com/packagemaze/pypi-smoke-test/simple/
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd backend
+          pip install -e ".[dev]"
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=pypi scenario=packagemaze-warm milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
+
+      - name: Set up PackageMaze for npm installs
+        id: packagemaze-npm-token
+        uses: packagemaze/setup-maze@v0.0.2
+        with:
+          feed: packagemaze/npm-smoke-test
+          purpose: install
+
+      - name: Install frontend dependencies with PackageMaze
+        env:
+          MAZE_TOKEN: ${{ steps.packagemaze-npm-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd frontend
+          npm ci
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=npm scenario=packagemaze-warm milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
+
+  install-benchmark-upstream:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' }}
+    runs-on: ubuntu-latest
+    name: Benchmark installs from upstream
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Install backend dependencies from upstream
+        env:
+          PIP_INDEX_URL: https://pypi.org/simple/
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd backend
+          pip install -e ".[dev]"
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=pypi scenario=upstream milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
+
+      - name: Install frontend dependencies from upstream
+        env:
+          MAZE_TOKEN: unused
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_REPLACE_REGISTRY_HOST: never
+        run: |
+          set -euo pipefail
+          start_ms="$(date +%s%3N)"
+          cd frontend
+          npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=never
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms - start_ms))"
+          printf 'BENCHMARK_RESULT repo=tiny-kanban protocol=npm scenario=upstream milliseconds=%s seconds=%s.%03d\n' "$elapsed_ms" "$((elapsed_ms / 1000))" "$((elapsed_ms % 1000))"
